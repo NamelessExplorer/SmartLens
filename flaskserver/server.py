@@ -9,6 +9,11 @@ from flask_cors import CORS, cross_origin
 from PIL import Image
 import sys
 import json
+from langchain.chains import RetrievalQAWithSourcesChain, ConversationalRetrievalChain
+from langchain.memory import ConversationBufferMemory
+from langchain.chains import LLMChain
+from langchain import PromptTemplate
+
 
 
 app = Flask(__name__)
@@ -46,7 +51,19 @@ def process():
 
         return status
 
+@app.route("/chat", methods=['POST'])
+def chat():
+    if request.method == 'POST':
 
+        try:
+            print("Hello")
+            message = request.json['message']
+            response = generate_conversational_retrieval_response(message)
+            response_data = {'response': response}
+            return jsonify(response_data)
+            
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host='192.168.8.106', port=5000, debug=True, )
