@@ -12,7 +12,7 @@ import json
 from langchain.chains import RetrievalQAWithSourcesChain, ConversationalRetrievalChain
 from langchain.memory import ConversationBufferMemory
 from langchain.chains import LLMChain
-from langchain import PromptTemplate
+from langchain_core.prompts import PromptTemplate
 
 
 
@@ -66,4 +66,4 @@ def chat():
             return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(host='192.168.8.106', port=5000, debug=True, )
+    app.run(host='192.168.29.170', port=5000, debug=True, )

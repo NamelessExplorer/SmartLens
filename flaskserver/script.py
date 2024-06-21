@@ -30,7 +30,7 @@ from pinecone import Pinecone, ServerlessSpec
 from langchain.vectorstores import pinecone
 from langchain_pinecone import PineconeVectorStore
 from dotenv import load_dotenv
-
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 load_dotenv()
@@ -68,7 +68,17 @@ def web_driver():
   options.add_argument("--window-size=1920, 1220")
   options.add_argument("--disable-dev-shm-usage")
   options.add_experimental_option("prefs", {"profile.managed_default_content_settings.images": 2})
-  driver = webdriver.Chrome(options=options)  # Replace with your preferred browser's WebDriver
+  capabilities = {
+        "browserName": "chrome",
+        "browserVersion": "latest",
+        "platformName": "ANY",
+        "goog:chromeOptions": {"args": ["--headless"]}
+    }
+  driver = webdriver.Remote(
+        command_executor='http://localhost:4444/wd/hub',
+        desired_capabilities=capabilities,
+        options=options
+    )  # Replace with your preferred browser's WebDriver
   return driver
 
 driver = web_driver()
@@ -113,12 +123,31 @@ while len(link_urls) < 10:
     if not driver.find_elements(By.CSS_SELECTOR, ".tF2Cxc"):
         break
 
-# Extract and display text from each link
-all_text = ""
-for i, link_url in enumerate(link_urls, start=1):
-    # print(f"{i}. {link_url}")
+driver.quit()
 
-    # Navigate to the link
+
+all_texts = []
+with ThreadPoolExecutor(max_workers=5) as executor:
+        futures = {executor.submit(scrape_link, url): url for url in link_urls}
+        for future in as_completed(futures):
+            link_url = futures[future]
+            try:
+                text = future.result()
+                all_texts.append(text)
+            except Exception as e:
+                print(f"Error scraping {link_url}: {e}")
+
+
+all_text = "\n".join(all_texts)
+
+# Extract and display text from each link
+
+def scrape_link(link_url):
+    driver = web_driver()
+    all_text = ""
+        # print(f"{i}. {link_url}")
+
+        # Navigate to the link
     try:
         driver.get(link_url)
         time.sleep(1)  # Adjust the wait time if necessary
@@ -132,10 +161,15 @@ for i, link_url in enumerate(link_urls, start=1):
         all_text += article.text + "\n"
     except TimeoutException:
         # print(f"Timeout exception for {link_url}. Moving to the next link.")
-        continue
+        print(f"Timeout exception for {link_url}. Moving to the next link.")
     except ArticleException as e:
         # print(f"Error extracting text from {link_url}: {e}")
-        continue  # Move to the next link on error
+        print(f"Error extracting text from {link_url}: {e}")
+    finally:
+        driver.quit()
+
+
+    return all_text
 
 # Save all extracted text to a single text file
 output_file_path = "extracted_text.txt"
@@ -227,24 +261,3 @@ data = {
 
 json_string = json.dumps(data)
 print(json_string)
-
-
-# demotemplate = '''Here is the input {row}. You are a Medical Assistant. Your role is to provide factual details about the medicine from the given data.'''
-
-# prompt = PromptTemplate(
-#             input_variables = ['row'],
-#             template = demotemplate
-#         )
-
-
-# summarizer = HuggingFaceHub(
-#           repo_id="facebook/bart-large-cnn",
-#           model_kwargs={"temperature":0, "max_length":2000}
-#         )
-
-
-# chain1 = LLMChain(llm=summarizer, prompt=prompt)
-
-# chain1.run()
-
-           

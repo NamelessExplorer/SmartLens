@@ -51,7 +51,7 @@ export default function Scan({navigation, route}){
               type: 'image/jpeg', // Adjust based on your image type
             });
 
-            const response = await axios.post('http://192.168.8.106:5000/uploads', formData, {
+            const response = await axios.post('http://192.168.29.170:5000/uploads', formData, {
               headers: {
                 'Content-Type': 'multipart/form-data',
               },

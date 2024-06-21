@@ -28,7 +28,7 @@ const ChatBot = () => {
 
         try{
             const response = await axios.post(
-                'http://192.168.8.106:5000/chat', 
+                'http://192.168.29.170:5000/chat', 
                 {
                     contents: updatedChat,
                 }
