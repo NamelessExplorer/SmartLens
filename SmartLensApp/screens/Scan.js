@@ -87,6 +87,32 @@ export default function Scan({navigation, route}){
         console.log(result);
 
 
+        const formData = new FormData();
+        formData.append("file", {
+          uri: result?.assets[0].uri,
+          name: 'image.png',
+          filename: result?.assets[0].fileName,
+          type: result?.assets[0].type,
+        }); // Add the image file to FormData
+
+        
+
+        const response = await axios.post('http://192.168.29.170:5000/uploads', formData, {
+              headers: {
+                'Content-Type': 'multipart/form-data',
+              },
+            });
+
+            if (response.status=200) {
+
+              console.log('Image upload successful!');
+              console.log(result.message)
+              
+            } else {
+              console.error('Image upload failed:', response.data.error);
+            }
+
+
         navigation.navigate('DisplayImage', { imageUri: result.assets[0].uri }); 
         }
         

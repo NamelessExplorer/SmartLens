@@ -14,6 +14,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import TimeoutException
+from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from newspaper import Article, ArticleException
 import time
 import os
@@ -56,6 +57,27 @@ for (bbox, text, prob) in result:
 
 # print(text)
 
+def get_driver():
+    options = webdriver.ChromeOptions()
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--headless")
+    driver = webdriver.Remote(
+        command_executor="http://127.0.0.1:4444/wd/hub", options=options
+    )
+    return driver
+
+
+driver1 = get_driver()
+print("Driver 1 is running")
+# The below code will get executed
+driver2 = get_driver()
+print("Driver 2 is running")
+
+driver1.quit()
+print("Driver 1 is closed")
+driver2.quit()
+print("driver 2 is closed")
+
 
 
 def web_driver():
@@ -81,73 +103,66 @@ def web_driver():
     )  # Replace with your preferred browser's WebDriver
   return driver
 
-driver = web_driver()
-
-
-# Construct the search query
-# print(search)
-search_query = f"{search}"
-
-# Navigate to Google Search
-driver.get("https://www.google.com/")
-
-# Find the search box and enter the query
-search_box = driver.find_element(By.NAME, "q")
-search_box.send_keys(search_query)
-search_box.send_keys(Keys.ENTER)
-
-# Wait for the search results to load (you may need to adjust the wait time)
-time.sleep(2)
 
 # Create an empty list to store link URLs
 link_urls = []
 
-# Scroll down to load more results dynamically
-while len(link_urls) < 10:
-    search_results = driver.find_elements(By.CSS_SELECTOR, ".tF2Cxc")
+def get_google_search_links(search_query):
+    
+    driver = web_driver()
+    driver.get("https://www.google.com/")
 
-    # Loop through search results and extract URL from each link
-    for result in search_results:
-        link_element = result.find_element(By.TAG_NAME, "a")
-        link_url = link_element.get_attribute("href")
-        link_urls.append(link_url)
-
-        if len(link_urls) == 10:
+        
+    options = webdriver.ChromeOptions()
+    options = Options()
+    options.add_argument("--headless")
+    options.add_argument("--verbose")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--window-size=1920, 1220")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_experimental_option("prefs", {"profile.managed_default_content_settings.images": 2})
+    
+    search_box = driver.find_element(By.NAME, "q")
+    search_box.send_keys(search_query)
+    search_box.send_keys(Keys.ENTER)
+    
+    time.sleep(2)
+    
+    link_urls = []
+    while len(link_urls) < 10:
+        search_results = driver.find_elements(By.CSS_SELECTOR, ".tF2Cxc")
+        for result in search_results:
+            link_element = result.find_element(By.TAG_NAME, "a")
+            link_url = link_element.get_attribute("href")
+            if link_url:
+                link_urls.append(link_url)
+            if len(link_urls) == 10:
+                break
+        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+        time.sleep(2)
+        if not driver.find_elements(By.CSS_SELECTOR, ".tF2Cxc"):
             break
-
-    # Scroll down to load more results
-    driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-    time.sleep(2)  # Adjust the wait time if necessary
-
-    # Check if there are no more results to load
-    if not driver.find_elements(By.CSS_SELECTOR, ".tF2Cxc"):
-        break
-
-driver.quit()
+    
+    driver.quit()
+    return link_urls
 
 
-all_texts = []
-with ThreadPoolExecutor(max_workers=5) as executor:
-        futures = {executor.submit(scrape_link, url): url for url in link_urls}
-        for future in as_completed(futures):
-            link_url = futures[future]
-            try:
-                text = future.result()
-                all_texts.append(text)
-            except Exception as e:
-                print(f"Error scraping {link_url}: {e}")
 
+hub_url = "http://your-selenium-grid-hub:4444/wd/hub"
 
-all_text = "\n".join(all_texts)
+# Desired capabilities (browser you want to use, e.g., Chrome)
+desired_capabilities = DesiredCapabilities.CHROME
 
 # Extract and display text from each link
 
 def scrape_link(link_url):
-    driver = web_driver()
+    driver = webdriver.Remote(
+        command_executor=hub_url,
+        desired_capabilities=desired_capabilities
+    )
     all_text = ""
-        # print(f"{i}. {link_url}")
-
-        # Navigate to the link
+    
     try:
         driver.get(link_url)
         time.sleep(1)  # Adjust the wait time if necessary
@@ -159,25 +174,29 @@ def scrape_link(link_url):
 
         # Append the extracted text to the overall text
         all_text += article.text + "\n"
+        
+        print(f"Scraped text from {link_url}")
+
     except TimeoutException:
-        # print(f"Timeout exception for {link_url}. Moving to the next link.")
         print(f"Timeout exception for {link_url}. Moving to the next link.")
     except ArticleException as e:
-        # print(f"Error extracting text from {link_url}: {e}")
         print(f"Error extracting text from {link_url}: {e}")
     finally:
         driver.quit()
-
-
+    
     return all_text
 
+
+with ThreadPoolExecutor(max_workers=4) as executor:
+        results = list(executor.map(scrape_link, link_urls))
+
+final_text = "".join(results)
 # Save all extracted text to a single text file
 output_file_path = "extracted_text.txt"
 with open(output_file_path, "w", encoding="utf-8") as file:
-    file.write(all_text)
+    file.write(final_text)
 
 # Close the browser
-driver.quit()
 
 time.sleep(2)
 
